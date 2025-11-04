@@ -9,6 +9,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Method not allowed' })
   }
 
+  // Check if OpenAI API key is configured
+  if (!process.env.OPENAI_API_KEY) {
+    console.error('OPENAI_API_KEY is not set')
+    return res.status(500).json({ message: 'OpenAI API not configured' })
+  }
+
   try {
     const { message, sensorData } = req.body
 

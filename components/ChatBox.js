@@ -1,10 +1,56 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import axios from 'axios'
 
 export default function ChatBox({ sensorData }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [isListening, setIsListening] = useState(false)
+  const [recognition, setRecognition] = useState(null)
+
+  // Initialize Web Speech API
+  useEffect(() => {
+    if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+      const recognitionInstance = new SpeechRecognition()
+      
+      recognitionInstance.continuous = false
+      recognitionInstance.interimResults = false
+      recognitionInstance.lang = 'vi-VN' // Vietnamese language
+      
+      recognitionInstance.onresult = (event) => {
+        const transcript = event.results[0][0].transcript
+        setInput(prev => prev + (prev ? ' ' : '') + transcript)
+        setIsListening(false)
+      }
+      
+      recognitionInstance.onerror = (event) => {
+        console.error('Speech recognition error:', event.error)
+        setIsListening(false)
+      }
+      
+      recognitionInstance.onend = () => {
+        setIsListening(false)
+      }
+      
+      setRecognition(recognitionInstance)
+    }
+  }, [])
+
+  const toggleListening = () => {
+    if (!recognition) {
+      alert('Trình duyệt của bạn không hỗ trợ nhận dạng giọng nói')
+      return
+    }
+
+    if (isListening) {
+      recognition.stop()
+      setIsListening(false)
+    } else {
+      recognition.start()
+      setIsListening(true)
+    }
+  }
 
   const handleSend = async () => {
     if (!input.trim()) return
@@ -93,10 +139,22 @@ export default function ChatBox({ sensorData }) {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyPress={handleKeyPress}
-          placeholder="Nhập tin nhắn..."
+          placeholder="Nhập tin nhắn hoặc nhấn mic..."
           className="flex-1 backdrop-blur-sm bg-white/50 border border-white/30 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-400 transition-all"
           disabled={loading}
         />
+        <button
+          onClick={toggleListening}
+          disabled={loading}
+          className={`px-4 py-3 rounded-xl transition-all duration-300 font-semibold ${
+            isListening 
+              ? 'bg-red-500 text-white animate-pulse' 
+              : 'bg-white/70 text-gray-700 hover:bg-white'
+          }`}
+          title={isListening ? 'Đang nghe...' : 'Nhấn để nói'}
+        >
+          {isListening ? '🎤 Đang nghe...' : '🎤'}
+        </button>
         <button
           onClick={handleSend}
           disabled={loading || !input.trim()}

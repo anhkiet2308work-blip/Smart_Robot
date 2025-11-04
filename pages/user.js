@@ -138,12 +138,6 @@ export default function UserMode() {
           <div className="max-w-7xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
               <h1 className="text-2xl font-bold text-white">👤 USER MODE</h1>
-              <button
-                onClick={() => router.push('/robot')}
-                className="bg-white text-gray-900 px-4 py-2 rounded-lg font-bold hover:bg-gray-100"
-              >
-                Chuyển sang Robot Mode
-              </button>
             </div>
           </div>
         </header>

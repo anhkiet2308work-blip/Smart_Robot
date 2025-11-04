@@ -5,6 +5,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Method not allowed' })
   }
 
+  // Check if Supabase is configured
+  if (!supabase) {
+    console.error('Supabase client is not initialized')
+    return res.status(500).json({ message: 'Database not configured' })
+  }
+
   try {
     // Get the latest reading from each sensor
     const tables = [

@@ -20,14 +20,31 @@ export default function UserMode() {
     try {
       console.log('🔄 Fetching sensor data from /api/sensors/latest...')
       const response = await axios.get('/api/sensors/latest')
-      console.log('✅ Response received:', response.status, response.data)
+      console.log('✅ Response received:', response.status)
       
-      if (!response.data || Object.keys(response.data).length === 0) {
-        console.warn('⚠️ Empty data received from API')
+      // Check if response has _meta (new format)
+      if (response.data._meta) {
+        console.log('📊 Meta info:', response.data._meta)
+        if (response.data._meta.errors && response.data._meta.errors.length > 0) {
+          console.error('⚠️ API returned errors:', response.data._meta.errors)
+        }
       }
       
-      setLatestData(response.data)
-      checkForAlerts(response.data)
+      // Remove _meta before setting data
+      const { _meta, ...sensorData } = response.data
+      
+      if (!sensorData || Object.keys(sensorData).length === 0) {
+        console.warn('⚠️ Empty data received from API')
+        console.warn('⚠️ This usually means:')
+        console.warn('  1. Environment variables not set on Vercel')
+        console.warn('  2. Database has no data')
+        console.warn('  3. Supabase connection failed')
+      } else {
+        console.log('✅ Received data for', Object.keys(sensorData).length, 'sensors')
+      }
+      
+      setLatestData(sensorData)
+      checkForAlerts(sensorData)
     } catch (error) {
       console.error('❌ Error fetching data:', error)
       console.error('Error details:', {

@@ -7,9 +7,11 @@ export default async function handler(req, res) {
 
   // Check if Supabase is configured
   if (!supabase) {
-    console.error('Supabase client is not initialized')
+    console.error('❌ Supabase client is not initialized')
     return res.status(500).json({ message: 'Database not configured' })
   }
+
+  console.log('✅ Supabase client initialized')
 
   try {
     // Get the latest reading from each sensor
@@ -25,6 +27,7 @@ export default async function handler(req, res) {
       'thieves_alarm',
     ]
 
+    console.log('📊 Fetching data from', tables.length, 'tables...')
     const latestData = {}
 
     for (const table of tables) {
@@ -35,11 +38,17 @@ export default async function handler(req, res) {
         .limit(1)
         .single()
 
-      if (!error && data) {
+      if (error) {
+        console.error(`❌ Error fetching ${table}:`, error.message)
+      } else if (data) {
+        console.log(`✅ ${table}:`, data)
         latestData[table] = data
+      } else {
+        console.warn(`⚠️ ${table}: No data found`)
       }
     }
 
+    console.log('📤 Returning data for', Object.keys(latestData).length, 'tables')
     res.status(200).json(latestData)
   } catch (error) {
     console.error('Error:', error)

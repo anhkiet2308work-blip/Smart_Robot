@@ -18,11 +18,23 @@ export default function UserMode() {
   // Fetch latest sensor data
   const fetchLatestData = async () => {
     try {
+      console.log('🔄 Fetching sensor data from /api/sensors/latest...')
       const response = await axios.get('/api/sensors/latest')
+      console.log('✅ Response received:', response.status, response.data)
+      
+      if (!response.data || Object.keys(response.data).length === 0) {
+        console.warn('⚠️ Empty data received from API')
+      }
+      
       setLatestData(response.data)
       checkForAlerts(response.data)
     } catch (error) {
-      console.error('Error fetching data:', error)
+      console.error('❌ Error fetching data:', error)
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      })
     }
   }
 

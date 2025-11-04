@@ -15,11 +15,23 @@ export default function RobotMode() {
   // Fetch latest sensor data
   const fetchLatestData = async () => {
     try {
+      console.log('🔄 [ROBOT MODE] Fetching sensor data from /api/sensors/latest...')
       const response = await axios.get('/api/sensors/latest')
+      console.log('✅ [ROBOT MODE] Response received:', response.status, response.data)
+      
+      if (!response.data || Object.keys(response.data).length === 0) {
+        console.warn('⚠️ [ROBOT MODE] Empty data received from API')
+      }
+      
       setLatestData(response.data)
       checkForAlerts(response.data)
     } catch (error) {
-      console.error('Error fetching data:', error)
+      console.error('❌ [ROBOT MODE] Error fetching data:', error)
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      })
     }
   }
 

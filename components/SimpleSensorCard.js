@@ -31,11 +31,11 @@ export default function SimpleSensorCard({ title, value, unit, onDismissAlert, h
   }
 
   return (
-    <div className={`${getCardColor()} backdrop-blur-xl rounded-xl shadow-lg p-4 border ${
+    <div className={`${getCardColor()} backdrop-blur-xl rounded-lg sm:rounded-xl shadow-lg p-3 sm:p-4 border ${
       hasAlert ? 'border-red-400 ring-2 ring-red-400' : ''
     }`}>
-      <div className="flex items-center justify-between mb-2">
-        <h3 className={`text-sm font-medium ${getTextColor()}`}>{title}</h3>
+      <div className="flex items-center justify-between mb-1 sm:mb-2">
+        <h3 className={`text-xs sm:text-sm font-medium ${getTextColor()}`}>{title}</h3>
         {hasAlert && onDismissAlert && (
           <button
             onClick={onDismissAlert}
@@ -46,8 +46,8 @@ export default function SimpleSensorCard({ title, value, unit, onDismissAlert, h
         )}
       </div>
       <div className="flex items-baseline">
-        <span className="text-2xl font-bold text-gray-800">{value}</span>
-        {unit && <span className="ml-1 text-gray-500">{unit}</span>}
+        <span className="text-xl sm:text-2xl font-bold text-gray-800">{value}</span>
+        {unit && <span className="ml-1 text-xs sm:text-sm text-gray-500">{unit}</span>}
       </div>
     </div>
   )

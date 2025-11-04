@@ -156,16 +156,16 @@ export default function RobotMode() {
 
         {/* Header */}
         <header className="bg-white/30 backdrop-blur-md shadow-lg">
-          <div className="max-w-7xl mx-auto px-4 py-4">
-            <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold text-white">🤖 ROBOT MODE</h1>
+          <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4">
+            <div className="flex items-center justify-center">
+              <h1 className="text-xl sm:text-2xl font-bold text-white">🤖 ROBOT MODE</h1>
             </div>
           </div>
         </header>
 
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 py-4 sm:py-8">
           {/* Sensors */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
             <SimpleSensorCard
               title="Nhiệt độ"
               value={latestData.temperature_sensor?.value || '--'}
@@ -189,7 +189,7 @@ export default function RobotMode() {
           </div>
 
           {/* Status Boxes */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
             <SimpleStatusBox
               title="Báo cháy"
               isActive={String(latestData.fire_alarm?.value || '').toUpperCase() === 'ON'}

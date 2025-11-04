@@ -1,19 +1,11 @@
-import { useEffect } from 'react'
-import { useRouter } from 'next/router'
 import Head from 'next/head'
 
 export default function Home() {
-  const router = useRouter()
-  
-  useEffect(() => {
-    // Redirect to robot mode by default
-    router.push('/robot')
-  }, [router])
-
   return (
     <>
       <Head>
         <title>Smart Robot Dashboard</title>
+        <meta httpEquiv="refresh" content="0; url=/robot" />
       </Head>
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-400 via-pink-400 to-blue-400">
         <div className="text-center text-white">
@@ -23,4 +15,14 @@ export default function Home() {
       </div>
     </>
   )
+}
+
+// Server-side redirect
+export async function getServerSideProps() {
+  return {
+    redirect: {
+      destination: '/robot',
+      permanent: false,
+    },
+  }
 }

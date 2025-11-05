@@ -78,40 +78,62 @@ export default function ChatBox({ sensorData }) {
   const speakText = (text) => {
     if (!isSpeechEnabled || !text) return
     
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel()
+    if (typeof window !== 'undefined') {
+      setIsSpeaking(true)
+      console.log('🔊 Speaking with Google Translate TTS...')
       
-      setTimeout(() => {
+      // Use Google Translate TTS API (free, no key needed)
+      const encodedText = encodeURIComponent(text)
+      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=vi&client=tw-ob&q=${encodedText}`
+      
+      const audio = new Audio(audioUrl)
+      
+      audio.onplay = () => {
+        console.log('✅ Google TTS started')
+        setIsSpeaking(true)
+      }
+      
+      audio.onended = () => {
+        console.log('✅ Google TTS ended')
+        setIsSpeaking(false)
+      }
+      
+      audio.onerror = (e) => {
+        console.error('❌ Google TTS error:', e)
+        setIsSpeaking(false)
+        
+        // Fallback to Web Speech API if Google TTS fails
+        console.log('⚠️ Fallback to Web Speech API...')
         const utterance = new SpeechSynthesisUtterance(text)
         const viVoice = getVietnameseVoice()
         
         if (viVoice) {
           utterance.voice = viVoice
           utterance.lang = viVoice.lang
-          console.log(` Using: ${viVoice.name} (${viVoice.lang})`)
         } else {
           utterance.lang = 'vi-VN'
-          console.warn(' No Vietnamese voice, forcing vi-VN lang')
         }
         
         utterance.rate = 0.95
-        utterance.pitch = 1.0
-        utterance.volume = 1.0
-        
-        utterance.onstart = () => setIsSpeaking(true)
         utterance.onend = () => setIsSpeaking(false)
-        utterance.onerror = (e) => {
-          console.error('Speech error:', e.error)
-          setIsSpeaking(false)
-        }
-        
         window.speechSynthesis.speak(utterance)
-      }, 150)
+      }
+      
+      audio.play().catch(err => {
+        console.error('Audio play failed:', err)
+        setIsSpeaking(false)
+      })
     }
   }
 
   const toggleSpeech = () => {
     if (isSpeaking) {
+      // Stop any playing audio
+      const audios = document.getElementsByTagName('audio')
+      Array.from(audios).forEach(audio => {
+        audio.pause()
+        audio.currentTime = 0
+      })
       window.speechSynthesis.cancel()
       setIsSpeaking(false)
     }

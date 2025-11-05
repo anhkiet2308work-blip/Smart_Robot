@@ -51,42 +51,32 @@ export default function RobotMode() {
   }
 
   const speakAlert = (text, alertId) => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    if (typeof window !== 'undefined') {
       // Chỉ đọc 1 lần cho mỗi lần cảnh báo được kích hoạt
       if (hasSpokenAlert[alertId]) return
       
-      // Dừng tất cả âm thanh đang phát
-      window.speechSynthesis.cancel()
+      console.log(`🚨 Alert speaking: ${alertId}`)
       
-      setTimeout(() => {
-        const utterance = new SpeechSynthesisUtterance(text)
-        const voices = window.speechSynthesis.getVoices()
-        
-        // Tìm giọng tiếng Việt (Google > Microsoft > any vi-VN)
-        const googleVi = voices.find(v => v.lang === 'vi-VN' && v.name.toLowerCase().includes('google'))
-        const microsoftVi = voices.find(v => v.lang === 'vi-VN' && v.name.toLowerCase().includes('microsoft'))
-        const anyVi = voices.find(v => v.lang === 'vi-VN')
-        const viVoice = googleVi || microsoftVi || anyVi || voices.find(v => v.lang.startsWith('vi'))
-        
-        if (viVoice) {
-          utterance.voice = viVoice
-          utterance.lang = viVoice.lang
-          console.log(`🔊 Alert speaking with: ${viVoice.name}`)
-        } else {
-          utterance.lang = 'vi-VN'
-          console.warn('⚠️ No Vietnamese voice for alert')
-        }
-        
-        utterance.rate = 1.0
-        utterance.pitch = 1.2
-        utterance.volume = 1.0
-        
-        utterance.onend = () => {
-          setHasSpokenAlert(prev => ({ ...prev, [alertId]: true }))
-        }
-        
-        window.speechSynthesis.speak(utterance)
-      }, 100)
+      // Use Google Translate TTS API
+      const encodedText = encodeURIComponent(text)
+      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=vi&client=tw-ob&q=${encodedText}`
+      
+      const audio = new Audio(audioUrl)
+      
+      audio.onended = () => {
+        console.log(`✅ Alert spoken: ${alertId}`)
+        setHasSpokenAlert(prev => ({ ...prev, [alertId]: true }))
+      }
+      
+      audio.onerror = (e) => {
+        console.error('❌ Google TTS alert error:', e)
+        setHasSpokenAlert(prev => ({ ...prev, [alertId]: true }))
+      }
+      
+      audio.play().catch(err => {
+        console.error('Audio play failed:', err)
+        setHasSpokenAlert(prev => ({ ...prev, [alertId]: true }))
+      })
     }
   }
 

@@ -14,6 +14,7 @@ export default function UserMode() {
   const [activeAlert, setActiveAlert] = useState(null)
   const [dismissedAlerts, setDismissedAlerts] = useState([])
   const [temporarilyHiddenPopups, setTemporarilyHiddenPopups] = useState([])
+  const [hasSpokenAlert, setHasSpokenAlert] = useState({})
 
   // Fetch latest sensor data
   const fetchLatestData = async () => {
@@ -55,6 +56,29 @@ export default function UserMode() {
     }
   }
 
+  const speakAlert = (text, alertId) => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      // Chỉ đọc 1 lần cho mỗi lần cảnh báo được kích hoạt
+      if (hasSpokenAlert[alertId]) return
+      
+      // Dừng tất cả âm thanh đang phát
+      window.speechSynthesis.cancel()
+      
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.lang = 'vi-VN'
+      utterance.rate = 1.1
+      utterance.pitch = 1.2
+      utterance.volume = 1.0
+      
+      utterance.onend = () => {
+        // Đánh dấu đã đọc xong
+        setHasSpokenAlert(prev => ({ ...prev, [alertId]: true }))
+      }
+      
+      window.speechSynthesis.speak(utterance)
+    }
+  }
+
   const checkForAlerts = (data) => {
     // ONLY show popup for CRITICAL alerts: fire and thieves
     
@@ -70,6 +94,8 @@ export default function UserMode() {
         message: 'Phát hiện có cháy! Vui lòng kiểm tra ngay!',
         canDismiss: true
       })
+      // Phát âm thanh cảnh báo cháy
+      speakAlert('Cảnh báo cháy! Phát hiện có lửa! Vui lòng kiểm tra ngay!', 'fire_alarm')
       return
     }
 
@@ -85,6 +111,8 @@ export default function UserMode() {
         message: 'Phát hiện có trộm! Cảnh báo an ninh!',
         canDismiss: true
       })
+      // Phát âm thanh cảnh báo trộm
+      speakAlert('Cảnh báo xâm nhập! Phát hiện có trộm! Cảnh báo an ninh!', 'thieves_alarm')
       return
     }
 
@@ -122,6 +150,8 @@ export default function UserMode() {
     }
     
     setDismissedAlerts([...dismissedAlerts, id])
+    // Reset trạng thái đã đọc để có thể đọc lại khi bật lại
+    setHasSpokenAlert(prev => ({ ...prev, [id]: false }))
   }
 
   const handleEnableStatus = async (id) => {

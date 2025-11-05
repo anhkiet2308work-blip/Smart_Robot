@@ -7,6 +7,8 @@ export default function ChatBox({ sensorData }) {
   const [loading, setLoading] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [recognition, setRecognition] = useState(null)
+  const [isSpeechEnabled, setIsSpeechEnabled] = useState(true)
+  const [isSpeaking, setIsSpeaking] = useState(false)
 
   // Initialize Web Speech API
   useEffect(() => {
@@ -45,6 +47,35 @@ export default function ChatBox({ sensorData }) {
     }
   }, [])
 
+  const speakText = (text) => {
+    if (!isSpeechEnabled) return
+    
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      // Stop any ongoing speech
+      window.speechSynthesis.cancel()
+      
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.lang = 'vi-VN'
+      utterance.rate = 1.0
+      utterance.pitch = 1.0
+      utterance.volume = 1.0
+      
+      utterance.onstart = () => setIsSpeaking(true)
+      utterance.onend = () => setIsSpeaking(false)
+      utterance.onerror = () => setIsSpeaking(false)
+      
+      window.speechSynthesis.speak(utterance)
+    }
+  }
+
+  const toggleSpeech = () => {
+    if (isSpeaking) {
+      window.speechSynthesis.cancel()
+      setIsSpeaking(false)
+    }
+    setIsSpeechEnabled(!isSpeechEnabled)
+  }
+
   const toggleListening = () => {
     if (!recognition) {
       alert('Trình duyệt của bạn không hỗ trợ nhận dạng giọng nói')
@@ -77,6 +108,9 @@ export default function ChatBox({ sensorData }) {
 
       const botMessage = { role: 'assistant', content: response.data.reply }
       setMessages(prev => [...prev, botMessage])
+      
+      // Đọc câu trả lời bằng giọng nói
+      speakText(response.data.reply)
     } catch (error) {
       console.error('Chat error:', error)
       const errorMessage = { 
@@ -102,12 +136,36 @@ export default function ChatBox({ sensorData }) {
 
   return (
     <div className="backdrop-blur-xl bg-white/70 rounded-xl sm:rounded-2xl shadow-xl p-3 sm:p-6 md:p-8 flex flex-col h-[500px] sm:h-[600px] border border-white/20">
-      <h3 className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent mb-3 sm:mb-6 flex items-center">
-        <svg className="w-6 h-6 sm:w-8 sm:h-8 mr-2 sm:mr-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-        </svg>
-        <span className="truncate">Chat với Robot AI</span>
-      </h3>
+      <div className="flex items-center justify-between mb-3 sm:mb-6">
+        <h3 className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent flex items-center">
+          <svg className="w-6 h-6 sm:w-8 sm:h-8 mr-2 sm:mr-3 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+          </svg>
+          <span className="truncate">Chat với Robot AI</span>
+        </h3>
+        
+        <button
+          onClick={toggleSpeech}
+          className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-2 rounded-lg transition-all text-xs sm:text-sm font-semibold ${
+            isSpeechEnabled 
+              ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+          }`}
+          title={isSpeechEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}
+        >
+          {isSpeechEnabled ? (
+            <>
+              <span className="text-base sm:text-lg">🔊</span>
+              <span className="hidden sm:inline">{isSpeaking ? 'Đang đọc...' : 'Âm thanh bật'}</span>
+            </>
+          ) : (
+            <>
+              <span className="text-base sm:text-lg">🔇</span>
+              <span className="hidden sm:inline">Âm thanh tắt</span>
+            </>
+          )}
+        </button>
+      </div>
       
       <div className="flex-1 overflow-y-auto mb-3 sm:mb-6 space-y-2 sm:space-y-4">
         {messages.length === 0 && (

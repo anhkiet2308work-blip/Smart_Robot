@@ -10,30 +10,43 @@ export default function ChatBox({ sensorData }) {
   const [isSpeechEnabled, setIsSpeechEnabled] = useState(true)
   const [isSpeaking, setIsSpeaking] = useState(false)
 
+  // Helper function to get best Vietnamese voice
+  const getVietnameseVoice = () => {
+    const voices = window.speechSynthesis.getVoices()
+    
+    // Priority: Google > Microsoft > any vi-VN
+    const googleVi = voices.find(v => v.lang === 'vi-VN' && v.name.toLowerCase().includes('google'))
+    const microsoftVi = voices.find(v => v.lang === 'vi-VN' && v.name.toLowerCase().includes('microsoft'))
+    const anyVi = voices.find(v => v.lang === 'vi-VN')
+    const viLang = voices.find(v => v.lang.startsWith('vi'))
+    
+    return googleVi || microsoftVi || anyVi || viLang || null
+  }
+
   // Load voices for Speech Synthesis
   useEffect(() => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      // Load voices
       const loadVoices = () => {
         const voices = window.speechSynthesis.getVoices()
-        console.log('🎤 Loaded voices:', voices.length)
-        voices.forEach(voice => {
-          if (voice.lang.startsWith('vi')) {
-            console.log('🇻🇳 Vietnamese voice available:', voice.name, voice.lang)
-          }
-        })
+        const viVoices = voices.filter(v => v.lang.startsWith('vi'))
+        
+        console.log(` Total voices: ${voices.length}, Vietnamese: ${viVoices.length}`)
+        viVoices.forEach(v => console.log(`   ${v.name} (${v.lang})`))
+        
+        if (viVoices.length === 0) {
+          console.error(' Không tìm thấy giọng tiếng Việt!')
+          console.error(' Cài đặt: Windows Settings > Time & Language > Speech > Add voices')
+        }
       }
       
       loadVoices()
-      
-      // Chrome loads voices asynchronously
       if (window.speechSynthesis.onvoiceschanged !== undefined) {
         window.speechSynthesis.onvoiceschanged = loadVoices
       }
     }
   }, [])
 
-  // Initialize Web Speech API
+  // Initialize Web Speech Recognition
   useEffect(() => {
     if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
@@ -41,19 +54,14 @@ export default function ChatBox({ sensorData }) {
       
       recognitionInstance.continuous = false
       recognitionInstance.interimResults = false
-      recognitionInstance.lang = 'vi-VN' // Vietnamese language
+      recognitionInstance.lang = 'vi-VN'
       
       recognitionInstance.onresult = (event) => {
         const transcript = event.results[0][0].transcript
-        const newInput = transcript
-        setInput(newInput)
+        setInput(transcript)
         setIsListening(false)
-        
-        // Tự động gửi tin nhắn sau khi thu âm xong
         setTimeout(() => {
-          if (newInput.trim()) {
-            handleSendMessage(newInput)
-          }
+          if (transcript.trim()) handleSendMessage(transcript)
         }, 500)
       }
       
@@ -62,65 +70,43 @@ export default function ChatBox({ sensorData }) {
         setIsListening(false)
       }
       
-      recognitionInstance.onend = () => {
-        setIsListening(false)
-      }
-      
+      recognitionInstance.onend = () => setIsListening(false)
       setRecognition(recognitionInstance)
     }
   }, [])
 
   const speakText = (text) => {
-    if (!isSpeechEnabled) {
-      console.log('🔇 Speech disabled')
-      return
-    }
+    if (!isSpeechEnabled || !text) return
     
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      console.log('🔊 Starting speech synthesis...')
-      
-      // Stop any ongoing speech
       window.speechSynthesis.cancel()
       
-      // Small delay to ensure synthesis is ready
       setTimeout(() => {
         const utterance = new SpeechSynthesisUtterance(text)
-        utterance.lang = 'vi-VN'
-        utterance.rate = 1.0
+        const viVoice = getVietnameseVoice()
+        
+        if (viVoice) {
+          utterance.voice = viVoice
+          utterance.lang = viVoice.lang
+          console.log(` Using: ${viVoice.name} (${viVoice.lang})`)
+        } else {
+          utterance.lang = 'vi-VN'
+          console.warn(' No Vietnamese voice, forcing vi-VN lang')
+        }
+        
+        utterance.rate = 0.95
         utterance.pitch = 1.0
         utterance.volume = 1.0
         
-        utterance.onstart = () => {
-          console.log('✅ Speech started')
-          setIsSpeaking(true)
-        }
-        utterance.onend = () => {
-          console.log('✅ Speech ended')
+        utterance.onstart = () => setIsSpeaking(true)
+        utterance.onend = () => setIsSpeaking(false)
+        utterance.onerror = (e) => {
+          console.error('Speech error:', e.error)
           setIsSpeaking(false)
-        }
-        utterance.onerror = (event) => {
-          console.error('❌ Speech error:', event.error)
-          setIsSpeaking(false)
-        }
-        
-        // Load voices if not loaded yet
-        const voices = window.speechSynthesis.getVoices()
-        console.log('🎤 Available voices:', voices.length)
-        
-        // Try to find Vietnamese voice
-        const viVoice = voices.find(voice => voice.lang.startsWith('vi'))
-        if (viVoice) {
-          utterance.voice = viVoice
-          console.log('🇻🇳 Using Vietnamese voice:', viVoice.name)
-        } else {
-          console.warn('⚠️ No Vietnamese voice found, using default')
         }
         
         window.speechSynthesis.speak(utterance)
-        console.log('📢 Speech queued')
-      }, 100)
-    } else {
-      console.error('❌ Speech Synthesis not supported')
+      }, 150)
     }
   }
 
@@ -134,59 +120,35 @@ export default function ChatBox({ sensorData }) {
 
   const toggleListening = () => {
     if (!recognition) {
-      alert('Trình duyệt của bạn không hỗ trợ nhận dạng giọng nói')
+      alert('Trình duyệt không hỗ trợ nhận dạng giọng nói')
       return
     }
-
     if (isListening) {
       recognition.stop()
-      setIsListening(false)
     } else {
       recognition.start()
-      setIsListening(true)
     }
+    setIsListening(!isListening)
   }
 
   const handleSendMessage = async (message) => {
     const textToSend = message || input
     if (!textToSend.trim()) return
 
-    const userMessage = { role: 'user', content: textToSend }
-    setMessages(prev => [...prev, userMessage])
+    setMessages(prev => [...prev, { role: 'user', content: textToSend }])
     setInput('')
     setLoading(true)
 
     try {
-      const response = await axios.post('/api/chat', {
-        message: textToSend,
-        sensorData,
-      })
-
-      const botMessage = { role: 'assistant', content: response.data.reply }
-      setMessages(prev => [...prev, botMessage])
-      
-      // Đọc câu trả lời bằng giọng nói
-      speakText(response.data.reply)
+      const response = await axios.post('/api/chat', { message: textToSend, sensorData })
+      const botReply = response.data.reply
+      setMessages(prev => [...prev, { role: 'assistant', content: botReply }])
+      speakText(botReply)
     } catch (error) {
       console.error('Chat error:', error)
-      const errorMessage = { 
-        role: 'assistant', 
-        content: 'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.' 
-      }
-      setMessages(prev => [...prev, errorMessage])
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Xin lỗi, đã có lỗi xảy ra.' }])
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleSend = () => {
-    handleSendMessage(input)
-  }
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
     }
   }
 
@@ -200,49 +162,22 @@ export default function ChatBox({ sensorData }) {
           <span className="truncate">Chat với Robot AI</span>
         </h3>
         
-        <button
-          onClick={toggleSpeech}
-          className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-2 rounded-lg transition-all text-xs sm:text-sm font-semibold ${
-            isSpeechEnabled 
-              ? 'bg-green-100 text-green-700 hover:bg-green-200' 
-              : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-          }`}
-          title={isSpeechEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}
-        >
-          {isSpeechEnabled ? (
-            <>
-              <span className="text-base sm:text-lg">🔊</span>
-              <span className="hidden sm:inline">{isSpeaking ? 'Đang đọc...' : 'Âm thanh bật'}</span>
-            </>
-          ) : (
-            <>
-              <span className="text-base sm:text-lg">🔇</span>
-              <span className="hidden sm:inline">Âm thanh tắt</span>
-            </>
-          )}
+        <button onClick={toggleSpeech} className={`flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-2 rounded-lg transition-all text-xs sm:text-sm font-semibold ${isSpeechEnabled ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+          {isSpeechEnabled ? <><span className="text-base sm:text-lg"></span><span className="hidden sm:inline">{isSpeaking ? 'Đang đọc...' : 'Âm thanh bật'}</span></> : <><span className="text-base sm:text-lg"></span><span className="hidden sm:inline">Âm thanh tắt</span></>}
         </button>
       </div>
       
       <div className="flex-1 overflow-y-auto mb-3 sm:mb-6 space-y-2 sm:space-y-4">
         {messages.length === 0 && (
           <div className="text-center text-gray-600 mt-8 sm:mt-16">
-            <div className="text-4xl sm:text-6xl mb-3 sm:mb-4">🤖</div>
+            <div className="text-4xl sm:text-6xl mb-3 sm:mb-4"></div>
             <p className="text-base sm:text-xl font-bold px-2">Xin chào! Tôi là trợ lý AI của robot.</p>
             <p className="text-sm sm:text-base mt-2 sm:mt-3 px-4">Hãy hỏi tôi về dữ liệu cảm biến, thời tiết, hoặc điều khiển robot!</p>
           </div>
         )}
         {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[85%] sm:max-w-[70%] md:max-w-[60%] rounded-lg sm:rounded-xl px-3 sm:px-5 py-2 sm:py-3 shadow-md ${
-                msg.role === 'user'
-                  ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white'
-                  : 'bg-white/90 text-gray-800 border border-white/40'
-              }`}
-            >
+          <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[85%] sm:max-w-[70%] md:max-w-[60%] rounded-lg sm:rounded-xl px-3 sm:px-5 py-2 sm:py-3 shadow-md ${msg.role === 'user' ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white' : 'bg-white/90 text-gray-800 border border-white/40'}`}>
               <p className="whitespace-pre-wrap text-sm sm:text-base">{msg.content}</p>
             </div>
           </div>
@@ -261,39 +196,11 @@ export default function ChatBox({ sensorData }) {
       </div>
 
       <div className="flex gap-1 sm:gap-2">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyPress={handleKeyPress}
-          placeholder="Nhập hoặc nhấn mic..."
-          className="flex-1 backdrop-blur-sm bg-white/50 border border-white/30 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-purple-400 transition-all"
-          disabled={loading}
-        />
-        <button
-          onClick={toggleListening}
-          disabled={loading}
-          className={`px-2 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl transition-all duration-300 font-semibold text-sm sm:text-base ${
-            isListening 
-              ? 'bg-red-500 text-white animate-pulse' 
-              : 'bg-white/70 text-gray-700 hover:bg-white'
-          }`}
-          title={isListening ? 'Đang nghe...' : 'Nhấn để nói'}
-        >
-          {isListening ? (
-            <span className="hidden sm:inline">🎤 Đang nghe...</span>
-          ) : (
-            '🎤'
-          )}
-          {isListening && <span className="sm:hidden">🎤</span>}
+        <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSendMessage(input))} placeholder="Nhập hoặc nhấn mic..." className="flex-1 backdrop-blur-sm bg-white/50 border border-white/30 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-purple-400 transition-all" disabled={loading} />
+        <button onClick={toggleListening} disabled={loading} className={`px-2 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl transition-all duration-300 font-semibold text-sm sm:text-base ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-white/70 text-gray-700 hover:bg-white'}`}>
+          {isListening ? <span className="hidden sm:inline"> Đang nghe...</span> : ''}
         </button>
-        <button
-          onClick={handleSend}
-          disabled={loading || !input.trim()}
-          className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-semibold text-sm sm:text-base whitespace-nowrap"
-        >
-          Gửi
-        </button>
+        <button onClick={() => handleSendMessage(input)} disabled={loading || !input.trim()} className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-semibold text-sm sm:text-base whitespace-nowrap">Gửi</button>
       </div>
     </div>
   )

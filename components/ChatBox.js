@@ -10,6 +10,29 @@ export default function ChatBox({ sensorData }) {
   const [isSpeechEnabled, setIsSpeechEnabled] = useState(true)
   const [isSpeaking, setIsSpeaking] = useState(false)
 
+  // Load voices for Speech Synthesis
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      // Load voices
+      const loadVoices = () => {
+        const voices = window.speechSynthesis.getVoices()
+        console.log('🎤 Loaded voices:', voices.length)
+        voices.forEach(voice => {
+          if (voice.lang.startsWith('vi')) {
+            console.log('🇻🇳 Vietnamese voice available:', voice.name, voice.lang)
+          }
+        })
+      }
+      
+      loadVoices()
+      
+      // Chrome loads voices asynchronously
+      if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = loadVoices
+      }
+    }
+  }, [])
+
   // Initialize Web Speech API
   useEffect(() => {
     if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
@@ -48,23 +71,56 @@ export default function ChatBox({ sensorData }) {
   }, [])
 
   const speakText = (text) => {
-    if (!isSpeechEnabled) return
+    if (!isSpeechEnabled) {
+      console.log('🔇 Speech disabled')
+      return
+    }
     
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      console.log('🔊 Starting speech synthesis...')
+      
       // Stop any ongoing speech
       window.speechSynthesis.cancel()
       
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.lang = 'vi-VN'
-      utterance.rate = 1.0
-      utterance.pitch = 1.0
-      utterance.volume = 1.0
-      
-      utterance.onstart = () => setIsSpeaking(true)
-      utterance.onend = () => setIsSpeaking(false)
-      utterance.onerror = () => setIsSpeaking(false)
-      
-      window.speechSynthesis.speak(utterance)
+      // Small delay to ensure synthesis is ready
+      setTimeout(() => {
+        const utterance = new SpeechSynthesisUtterance(text)
+        utterance.lang = 'vi-VN'
+        utterance.rate = 1.0
+        utterance.pitch = 1.0
+        utterance.volume = 1.0
+        
+        utterance.onstart = () => {
+          console.log('✅ Speech started')
+          setIsSpeaking(true)
+        }
+        utterance.onend = () => {
+          console.log('✅ Speech ended')
+          setIsSpeaking(false)
+        }
+        utterance.onerror = (event) => {
+          console.error('❌ Speech error:', event.error)
+          setIsSpeaking(false)
+        }
+        
+        // Load voices if not loaded yet
+        const voices = window.speechSynthesis.getVoices()
+        console.log('🎤 Available voices:', voices.length)
+        
+        // Try to find Vietnamese voice
+        const viVoice = voices.find(voice => voice.lang.startsWith('vi'))
+        if (viVoice) {
+          utterance.voice = viVoice
+          console.log('🇻🇳 Using Vietnamese voice:', viVoice.name)
+        } else {
+          console.warn('⚠️ No Vietnamese voice found, using default')
+        }
+        
+        window.speechSynthesis.speak(utterance)
+        console.log('📢 Speech queued')
+      }, 100)
+    } else {
+      console.error('❌ Speech Synthesis not supported')
     }
   }
 

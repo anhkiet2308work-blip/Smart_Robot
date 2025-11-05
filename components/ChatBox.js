@@ -80,49 +80,64 @@ export default function ChatBox({ sensorData }) {
     
     if (typeof window !== 'undefined') {
       setIsSpeaking(true)
-      console.log('🔊 Speaking with Google Translate TTS...')
+      console.log('🔊 Speaking with Vietnamese TTS...')
       
-      // Use Google Translate TTS API (free, no key needed)
-      const encodedText = encodeURIComponent(text)
-      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=vi&client=tw-ob&q=${encodedText}`
+      // Split long text into chunks (Google TTS has 200 char limit)
+      const maxLength = 200
+      const chunks = []
+      let remaining = text
       
-      const audio = new Audio(audioUrl)
-      
-      audio.onplay = () => {
-        console.log('✅ Google TTS started')
-        setIsSpeaking(true)
-      }
-      
-      audio.onended = () => {
-        console.log('✅ Google TTS ended')
-        setIsSpeaking(false)
-      }
-      
-      audio.onerror = (e) => {
-        console.error('❌ Google TTS error:', e)
-        setIsSpeaking(false)
-        
-        // Fallback to Web Speech API if Google TTS fails
-        console.log('⚠️ Fallback to Web Speech API...')
-        const utterance = new SpeechSynthesisUtterance(text)
-        const viVoice = getVietnameseVoice()
-        
-        if (viVoice) {
-          utterance.voice = viVoice
-          utterance.lang = viVoice.lang
-        } else {
-          utterance.lang = 'vi-VN'
+      while (remaining.length > 0) {
+        if (remaining.length <= maxLength) {
+          chunks.push(remaining)
+          break
         }
         
-        utterance.rate = 0.95
-        utterance.onend = () => setIsSpeaking(false)
-        window.speechSynthesis.speak(utterance)
+        // Find last sentence end before maxLength
+        let splitPoint = remaining.lastIndexOf('.', maxLength)
+        if (splitPoint === -1) splitPoint = remaining.lastIndexOf(',', maxLength)
+        if (splitPoint === -1) splitPoint = remaining.lastIndexOf(' ', maxLength)
+        if (splitPoint === -1) splitPoint = maxLength
+        
+        chunks.push(remaining.substring(0, splitPoint + 1))
+        remaining = remaining.substring(splitPoint + 1).trim()
       }
       
-      audio.play().catch(err => {
-        console.error('Audio play failed:', err)
-        setIsSpeaking(false)
-      })
+      let currentChunk = 0
+      
+      const playNextChunk = () => {
+        if (currentChunk >= chunks.length) {
+          console.log('✅ All chunks played')
+          setIsSpeaking(false)
+          return
+        }
+        
+        const chunkText = chunks[currentChunk]
+        const encodedText = encodeURIComponent(chunkText)
+        // Use different Google TTS endpoint with proper parameters
+        const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=vi&total=1&idx=0&textlen=${chunkText.length}&client=tw-ob&prev=input&ttsspeed=0.9`
+        
+        console.log(`🎵 Playing chunk ${currentChunk + 1}/${chunks.length}`)
+        
+        const audio = new Audio(audioUrl)
+        
+        audio.onended = () => {
+          currentChunk++
+          setTimeout(playNextChunk, 300) // Small pause between chunks
+        }
+        
+        audio.onerror = (e) => {
+          console.error(`❌ Error playing chunk ${currentChunk + 1}:`, e)
+          setIsSpeaking(false)
+        }
+        
+        audio.play().catch(err => {
+          console.error('Audio play failed:', err)
+          setIsSpeaking(false)
+        })
+      }
+      
+      playNextChunk()
     }
   }
 

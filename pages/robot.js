@@ -57,9 +57,9 @@ export default function RobotMode() {
       
       console.log(`🚨 Alert speaking: ${alertId}`)
       
-      // Use Google Translate TTS API
+      // Use Google Translate TTS API with proper parameters
       const encodedText = encodeURIComponent(text)
-      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=vi&client=tw-ob&q=${encodedText}`
+      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=vi&total=1&idx=0&textlen=${text.length}&client=tw-ob&prev=input&ttsspeed=1.0`
       
       const audio = new Audio(audioUrl)
       

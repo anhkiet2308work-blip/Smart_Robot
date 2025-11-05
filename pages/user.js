@@ -61,13 +61,16 @@ export default function UserMode() {
       // Chỉ đọc 1 lần cho mỗi lần cảnh báo được kích hoạt
       if (hasSpokenAlert[alertId]) return
       
-      console.log(`🚨 Alert speaking: ${alertId}`)
+      console.log(`🚨 Alert speaking: ${alertId} - "${text}"`)
       
-      // Use Google Translate TTS API with proper parameters
-      const encodedText = encodeURIComponent(text)
-      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=vi&total=1&idx=0&textlen=${text.length}&client=tw-ob&prev=input&ttsspeed=1.0`
+      // Use our API proxy for TTS
+      const audioUrl = `/api/tts?text=${encodeURIComponent(text)}`
       
       const audio = new Audio(audioUrl)
+      
+      audio.onloadeddata = () => {
+        console.log(`📥 Alert audio loaded: ${alertId}`)
+      }
       
       audio.onended = () => {
         console.log(`✅ Alert spoken: ${alertId}`)
@@ -75,12 +78,12 @@ export default function UserMode() {
       }
       
       audio.onerror = (e) => {
-        console.error('❌ Google TTS alert error:', e)
+        console.error(`❌ Alert TTS error for ${alertId}:`, e)
         setHasSpokenAlert(prev => ({ ...prev, [alertId]: true }))
       }
       
       audio.play().catch(err => {
-        console.error('Audio play failed:', err)
+        console.error('Alert audio play failed:', err)
         setHasSpokenAlert(prev => ({ ...prev, [alertId]: true }))
       })
     }

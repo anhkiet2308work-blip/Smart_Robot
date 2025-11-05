@@ -113,21 +113,30 @@ export default function ChatBox({ sensorData }) {
         }
         
         const chunkText = chunks[currentChunk]
-        const encodedText = encodeURIComponent(chunkText)
-        // Use different Google TTS endpoint with proper parameters
-        const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=vi&total=1&idx=0&textlen=${chunkText.length}&client=tw-ob&prev=input&ttsspeed=0.9`
+        // Use our own API proxy to avoid CORS issues
+        const audioUrl = `/api/tts?text=${encodeURIComponent(chunkText)}`
         
-        console.log(`🎵 Playing chunk ${currentChunk + 1}/${chunks.length}`)
+        console.log(`🎵 Playing chunk ${currentChunk + 1}/${chunks.length}: "${chunkText.substring(0, 30)}..."`)
         
         const audio = new Audio(audioUrl)
         
+        audio.onloadeddata = () => {
+          console.log(`📥 Chunk ${currentChunk + 1} loaded`)
+        }
+        
         audio.onended = () => {
+          console.log(`✅ Chunk ${currentChunk + 1} ended`)
           currentChunk++
           setTimeout(playNextChunk, 300) // Small pause between chunks
         }
         
         audio.onerror = (e) => {
           console.error(`❌ Error playing chunk ${currentChunk + 1}:`, e)
+          console.error('Audio error details:', {
+            error: audio.error,
+            networkState: audio.networkState,
+            readyState: audio.readyState
+          })
           setIsSpeaking(false)
         }
         

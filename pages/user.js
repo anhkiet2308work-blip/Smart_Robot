@@ -14,6 +14,9 @@ export default function UserMode() {
   const [activeAlert, setActiveAlert] = useState(null)
   const [dismissedAlerts, setDismissedAlerts] = useState([])
   const [temporarilyHiddenPopups, setTemporarilyHiddenPopups] = useState([])
+  const [hasSpokenAlert, setHasSpokenAlert] = useState({})
+  const [manualToggleInProgress, setManualToggleInProgress] = useState(false)
+  const [lastRemoteValues, setLastRemoteValues] = useState({})
 
   // Fetch latest sensor data
   const fetchLatestData = async () => {
@@ -55,13 +58,57 @@ export default function UserMode() {
     }
   }
 
+  const speakAlert = (text, alertId) => {
+    if (typeof window !== 'undefined') {
+      // Chỉ đọc 1 lần cho mỗi lần cảnh báo được kích hoạt
+      if (hasSpokenAlert[alertId]) return
+      
+      console.log(`🚨 Alert speaking: ${alertId} - "${text}"`)
+      
+      // Use our API proxy for TTS
+      const audioUrl = `/api/tts?text=${encodeURIComponent(text)}`
+      
+      const audio = new Audio(audioUrl)
+      
+      audio.onloadeddata = () => {
+        console.log(`📥 Alert audio loaded: ${alertId}`)
+      }
+      
+      audio.onended = () => {
+        console.log(`✅ Alert spoken: ${alertId}`)
+        setHasSpokenAlert(prev => ({ ...prev, [alertId]: true }))
+      }
+      
+      audio.onerror = (e) => {
+        console.error(`❌ Alert TTS error for ${alertId}:`, e)
+        setHasSpokenAlert(prev => ({ ...prev, [alertId]: true }))
+      }
+      
+      audio.play().catch(err => {
+        console.error('Alert audio play failed:', err)
+        setHasSpokenAlert(prev => ({ ...prev, [alertId]: true }))
+      })
+    }
+  }
+
   const checkForAlerts = (data) => {
     // ONLY show popup for CRITICAL alerts: fire and thieves
+    // ĐIỀU KIỆN HIỆN POPUP:
+    // 1. Cảnh báo đang ON trong database
+    // 2. KHÔNG phải thay đổi thủ công từ user
+    // 3. Giá trị thay đổi từ OFF -> ON (remote trigger)
     
     // Check fire alarm - CRITICAL (User can dismiss)
-    if (String(data.fire_alarm?.value || '').toUpperCase() === 'ON' 
+    const fireValue = String(data.fire_alarm?.value || '').toUpperCase()
+    const lastFireValue = lastRemoteValues.fire_alarm || 'OFF'
+    
+    if (fireValue === 'ON' 
         && !dismissedAlerts.includes('fire_alarm')
-        && !temporarilyHiddenPopups.includes('fire_alarm')) {
+        && !temporarilyHiddenPopups.includes('fire_alarm')
+        && !manualToggleInProgress
+        && lastFireValue !== 'ON') { // Chỉ popup khi thay đổi từ OFF -> ON
+      
+      console.log('🔥 FIRE ALARM TRIGGERED by remote JSON')
       setActiveAlert({
         id: 'fire_alarm',
         severity: 'critical',
@@ -70,13 +117,23 @@ export default function UserMode() {
         message: 'Phát hiện có cháy! Vui lòng kiểm tra ngay!',
         canDismiss: true
       })
+      // Phát âm thanh cảnh báo cháy
+      speakAlert('Cảnh báo cháy! Phát hiện có lửa! Vui lòng kiểm tra ngay!', 'fire_alarm')
+      setLastRemoteValues(prev => ({ ...prev, fire_alarm: 'ON' }))
       return
     }
 
     // Check thieves alarm - CRITICAL (User can dismiss)
-    if (String(data.thieves_alarm?.value || '').toUpperCase() === 'ON' 
+    const thievesValue = String(data.thieves_alarm?.value || '').toUpperCase()
+    const lastThievesValue = lastRemoteValues.thieves_alarm || 'OFF'
+    
+    if (thievesValue === 'ON' 
         && !dismissedAlerts.includes('thieves_alarm')
-        && !temporarilyHiddenPopups.includes('thieves_alarm')) {
+        && !temporarilyHiddenPopups.includes('thieves_alarm')
+        && !manualToggleInProgress
+        && lastThievesValue !== 'ON') { // Chỉ popup khi thay đổi từ OFF -> ON
+      
+      console.log('🚨 THIEVES ALARM TRIGGERED by remote JSON')
       setActiveAlert({
         id: 'thieves_alarm',
         severity: 'critical',
@@ -85,7 +142,18 @@ export default function UserMode() {
         message: 'Phát hiện có trộm! Cảnh báo an ninh!',
         canDismiss: true
       })
+      // Phát âm thanh cảnh báo trộm
+      speakAlert('Cảnh báo xâm nhập! Phát hiện có trộm! Cảnh báo an ninh!', 'thieves_alarm')
+      setLastRemoteValues(prev => ({ ...prev, thieves_alarm: 'ON' }))
       return
+    }
+
+    // Update lastRemoteValues for next comparison
+    if (fireValue !== lastFireValue) {
+      setLastRemoteValues(prev => ({ ...prev, fire_alarm: fireValue }))
+    }
+    if (thievesValue !== lastThievesValue) {
+      setLastRemoteValues(prev => ({ ...prev, thieves_alarm: thievesValue }))
     }
 
     // NO POPUP for diffuser, music, light - only status boxes
@@ -110,6 +178,10 @@ export default function UserMode() {
 
   const handleDismissStatus = async (id) => {
     console.log('💾 NÚT TẮT - Đang cập nhật database:', id)
+    
+    // Đánh dấu là thay đổi thủ công - KHÔNG hiện popup
+    setManualToggleInProgress(true)
+    
     // Update database to turn OFF
     try {
       await axios.post('/api/sensors/update', {
@@ -117,14 +189,27 @@ export default function UserMode() {
         value: 'OFF'
       })
       console.log(`✅ ĐÃ CẬP NHẬT database - Turned OFF ${id}`)
+      
+      // Cập nhật lastRemoteValues để không popup khi poll
+      setLastRemoteValues(prev => ({ ...prev, [id]: 'OFF' }))
     } catch (error) {
       console.error('❌ LỖI khi cập nhật database:', error)
     }
     
     setDismissedAlerts([...dismissedAlerts, id])
+    // Reset trạng thái đã đọc để có thể đọc lại khi bật lại
+    setHasSpokenAlert(prev => ({ ...prev, [id]: false }))
+    
+    // Reset flag sau 1 giây
+    setTimeout(() => setManualToggleInProgress(false), 1000)
   }
 
   const handleEnableStatus = async (id) => {
+    console.log('💾 NÚT BẬT - Đang cập nhật database:', id)
+    
+    // Đánh dấu là thay đổi thủ công - KHÔNG hiện popup
+    setManualToggleInProgress(true)
+    
     // Update database to turn ON
     try {
       await axios.post('/api/sensors/update', {
@@ -133,11 +218,17 @@ export default function UserMode() {
       })
       console.log(`✅ Turned ON ${id} in database`)
       
+      // Cập nhật lastRemoteValues để không popup khi poll
+      setLastRemoteValues(prev => ({ ...prev, [id]: 'ON' }))
+      
       // Remove from dismissed list to show alert again
       setDismissedAlerts(dismissedAlerts.filter(item => item !== id))
     } catch (error) {
       console.error('Error updating sensor:', error)
     }
+    
+    // Reset flag sau 1 giây
+    setTimeout(() => setManualToggleInProgress(false), 1000)
   }
 
   useEffect(() => {

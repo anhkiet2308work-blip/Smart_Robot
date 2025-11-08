@@ -244,7 +244,8 @@ export default function ChatBox({ sensorData }) {
       <div className="flex gap-1 sm:gap-2">
         <input type="text" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), handleSendMessage(input))} placeholder="Nhập hoặc nhấn mic..." className="flex-1 backdrop-blur-sm bg-white/50 border border-white/30 rounded-lg sm:rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-purple-400 transition-all" disabled={loading} />
         <button onClick={toggleListening} disabled={loading} className={`px-2 sm:px-4 py-2 sm:py-3 rounded-lg sm:rounded-xl transition-all duration-300 font-semibold text-sm sm:text-base ${isListening ? 'bg-red-500 text-white animate-pulse' : 'bg-white/70 text-gray-700 hover:bg-white'}`}>
-          {isListening ? <span className="hidden sm:inline"> Đang nghe...</span> : ''}
+          <span className="text-xl">🎤</span>
+          {isListening && <span className="hidden sm:inline ml-1"> Đang nghe...</span>}
         </button>
         <button onClick={() => handleSendMessage(input)} disabled={loading || !input.trim()} className="bg-gradient-to-r from-purple-500 to-blue-500 text-white px-3 sm:px-6 py-2 sm:py-3 rounded-lg sm:rounded-xl hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 font-semibold text-sm sm:text-base whitespace-nowrap">Gửi</button>
       </div>
